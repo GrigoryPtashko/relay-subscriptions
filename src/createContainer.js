@@ -9,9 +9,14 @@ import type Subscription from './Subscription';
 import type { SubscriptionDisposable } from './types';
 
 type subscriptionFn = (props: Object) => ?Subscription<any>;
+type manualSubscriptionFn = (props: Object, arg: Object) => ?Subscription<any>;
 
 type ActiveSubscription = {
   subscription: Subscription<any>,
+  disposable: SubscriptionDisposable,
+}
+
+type ActiveManualSubscription = {
   disposable: SubscriptionDisposable,
 }
 
@@ -20,12 +25,25 @@ function disposeActiveSubscription(activeSubscription) {
     return;
   }
 
-  activeSubscription.disposable.dispose();
+  if (activeSubscription.disposable) {
+    activeSubscription.disposable.dispose();
+  }
+}
+
+function disposeActiveManualSubscription(activeManualSubscription) {
+  if (!activeManualSubscription) {
+    return;
+  }
+
+  if (activeManualSubscription.disposable) {
+    activeManualSubscription.disposable.dispose();
+  }
 }
 
 function subscribe(
   Component: ReactClass<any>,
   subscriptionsSpec: ?Array<subscriptionFn>,
+  manualSubscriptionsSpec: ?Array<manualSubscriptionFn>,
 ) {
   const componentName = Component.displayName || Component.name || 'Component';
 
@@ -42,12 +60,14 @@ function subscribe(
 
     relayProp: mixed;
     activeSubscriptions: Array<?ActiveSubscription>;
+    activeManualSubscriptions: Array<?ActiveManualSubscription>;
 
     constructor(props, context) {
       super(props, context);
 
       this.relayProp = this.makeRelayProp(props);
       this.activeSubscriptions = [];
+      this.activeManualSubscriptions = [];
     }
 
     componentDidMount() {
@@ -55,6 +75,14 @@ function subscribe(
         subscriptionsSpec.forEach((createSubscription) => {
           this.activeSubscriptions.push(
             this.makeActiveSubscription(createSubscription(this.props)),
+          );
+        });
+      }
+
+      if (manualSubscriptionsSpec) {
+        manualSubscriptionsSpec.forEach((createSubscription) => {
+          this.activeManualSubscriptions.push(
+            this.makeActiveManualSubscription(arg => createSubscription(this.props, arg))
           );
         });
       }
@@ -86,6 +114,10 @@ function subscribe(
       if (subscriptionsSpec) {
         this.activeSubscriptions.forEach(disposeActiveSubscription);
       }
+
+      if (manualSubscriptionsSpec) {
+        this.activeManualSubscriptions.forEach(disposeActiveManualSubscription);
+      }
     }
 
     makeRelayProp(props) {
@@ -103,6 +135,16 @@ function subscribe(
       return {
         subscription,
         disposable: this.context.relay.subscribe(subscription),
+      };
+    }
+
+    makeActiveManualSubscription(subscriptionFn) {
+      if (!subscriptionFn) {
+        return;
+      }
+
+      return {
+        disposable: this.context.relay._storeData.getNetworkLayer().sendSubscription(subscriptionFn)
       };
     }
 
@@ -147,10 +189,10 @@ function subscribe(
 
 export default function createContainer(
   Component: ReactClass<any>,
-  spec: RelayContainerSpec & { subscriptions?: subscriptionFn[] },
+  spec: RelayContainerSpec & { subscriptions?: subscriptionFn[], manualSubscriptions?: manualSubscriptionFn[] },
 ) {
   return Relay.createContainer(
-    subscribe(Component, spec.subscriptions),
+    subscribe(Component, spec.subscriptions, spec.manualSubscriptions),
     spec
   );
 }

@@ -9,19 +9,23 @@ import type {
   SubscriptionResult,
   Variables,
 } from './types';
+import type Subscription from './Subscription';
 
 export default class SubscriptionRequest {
   _printedQuery: ?PrintedQuery;
   _subscription: RelayQuery.Subscription;
   _observer: SubscriptionRequestObserver;
+  _originalSubscription: Subscription<any>;
 
   constructor(
     subscription: RelayQuery.Subscription,
     observer: SubscriptionRequestObserver,
+    originalSubscription: Subscription<any>
   ) {
     this._printedQuery = null;
     this._subscription = subscription;
     this._observer = observer;
+    this._originalSubscription = originalSubscription;
   }
 
   getDebugName(): string {
@@ -46,6 +50,10 @@ export default class SubscriptionRequest {
 
   getClientSubscriptionId(): string {
     return this._subscription.getVariables().input.clientSubscriptionId;
+  }
+
+  getOriginalSubscription(): Subscription<any> {
+    return this._originalSubscription;
   }
 
   onNext(payload: SubscriptionResult) {

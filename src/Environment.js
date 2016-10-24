@@ -45,10 +45,16 @@ export default class Environment extends Relay.Environment {
     observer?: SubscriptionObserver,
   ) => SubscriptionDisposable;
 
+  manualSubscribe: (
+    subscription: Subscription<any>,
+    observer?: SubscriptionObserver,
+  ) => SubscriptionRequest;
+
   constructor(storeData?: StoreData) {
     super(storeData || new StoreData());
 
     this.subscribe = this.subscribe.bind(this);
+    this.manualSubscribe = this.manualSubscribe.bind(this);
 
     this._nextClientSubscriptionId = 0;
   }
@@ -103,7 +109,59 @@ export default class Environment extends Relay.Environment {
     }
 
     return this._storeData.getNetworkLayer().sendSubscription(
-      new SubscriptionRequest(query, requestObserver),
+      new SubscriptionRequest(query, requestObserver, subscription),
     );
+  }
+
+  manualSubscribe(
+    subscription: Subscription<any>,
+    observer?: SubscriptionObserver,
+  ): SubscriptionRequest {
+    const clientSubscriptionId = this._nextClientSubscriptionId.toString(36);
+    ++this._nextClientSubscriptionId;
+
+    subscription.bindEnvironment(this);
+
+    const query = createSubscriptionQuery(subscription.getSubscription(), {
+      input: {
+        ...subscription.getVariables(),
+        clientSubscriptionId,
+      },
+    });
+
+    const onPayload = (payload) => {
+      updateStoreData(this, subscription.getConfigs(), query, payload);
+    };
+
+    let requestObserver;
+    if (observer) {
+      const definedObserver = observer; // Placate Flow.
+      requestObserver = {
+        onNext: (payload) => {
+          onPayload(payload);
+          if (definedObserver.onNext) {
+            definedObserver.onNext(payload);
+          }
+        },
+        onError: (error) => {
+          if (definedObserver.onError) {
+            definedObserver.onError(error);
+          }
+        },
+        onCompleted: (value) => {
+          if (definedObserver.onCompleted) {
+            definedObserver.onCompleted(value);
+          }
+        },
+      };
+    } else {
+      requestObserver = {
+        onNext: onPayload,
+        onError: () => {},
+        onCompleted: () => {},
+      };
+    }
+
+    return new SubscriptionRequest(query, requestObserver, subscription);
   }
 }
