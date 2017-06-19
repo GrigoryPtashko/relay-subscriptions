@@ -1,8 +1,9 @@
 /* @flow */
 
 import isEqual from 'lodash/isEqual';
+import PropTypes from 'prop-types';
 import React from 'react';
-import Relay from 'react-relay';
+import Relay from 'react-relay/classic';
 import type { RelayContainerSpec } from 'react-relay/lib/RelayContainer';
 
 import type Subscription from './Subscription';
@@ -51,11 +52,11 @@ function subscribe(
     static displayName = `Subscribe(${componentName})`;
 
     static propTypes = {
-      relay: React.PropTypes.object.isRequired,
+      relay: PropTypes.object.isRequired,
     };
 
     static contextTypes = {
-      relay: Relay.PropTypes.Environment,
+      relay: Relay.PropTypes.ClassicRelay,
     };
 
     relayProp: mixed;
@@ -123,7 +124,7 @@ function subscribe(
     makeRelayProp(props) {
       return {
         ...props.relay,
-        subscribe: this.context.relay.subscribe,
+        subscribe: this.context.relay.environment.startSubscription,
       };
     }
 
@@ -134,7 +135,7 @@ function subscribe(
 
       return {
         subscription,
-        disposable: this.context.relay.subscribe(subscription),
+        disposable: this.context.relay.environment.startSubscription(subscription),
       };
     }
 
@@ -167,7 +168,7 @@ function subscribe(
       }
 
       // Need to bind subscription to Relay environment to get variables.
-      nextSubscription.bindEnvironment(this.context.relay);
+      nextSubscription.bindEnvironment(this.context.relay.environment);
 
       // Check if variables match.
       return isEqual(

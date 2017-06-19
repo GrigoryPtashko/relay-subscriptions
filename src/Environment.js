@@ -1,7 +1,7 @@
 /* @flow */
 
 import invariant from 'invariant';
-import Relay from 'react-relay';
+import Relay from 'react-relay/classic';
 import RelayNetworkLayer from 'react-relay/lib/RelayNetworkLayer';
 import RelayStoreData from 'react-relay/lib/RelayStoreData';
 
@@ -40,7 +40,7 @@ class StoreData extends RelayStoreData {
 }
 
 export default class Environment extends Relay.Environment {
-  subscribe: (
+  startSubscription: (
     subscription: Subscription<any>,
     observer?: SubscriptionObserver,
   ) => SubscriptionDisposable;
@@ -53,13 +53,13 @@ export default class Environment extends Relay.Environment {
   constructor(storeData?: StoreData) {
     super(storeData || new StoreData());
 
-    this.subscribe = this.subscribe.bind(this);
+    this.startSubscription = this.startSubscription.bind(this);
     this.manualSubscribe = this.manualSubscribe.bind(this);
 
     this._nextClientSubscriptionId = 0;
   }
 
-  subscribe(
+  startSubscription(
     subscription: Subscription<any>,
     observer?: SubscriptionObserver,
   ): SubscriptionDisposable {
